@@ -1,0 +1,73 @@
+# ============================================================
+#  Pterodactyl PANEL  (PHP + MySQL + Redis + Node)
+# ============================================================
+features:
+  -
+    create:
+      domain: hideous-injury-kuy.sgp.dom.my.id
+      user: hideous-injury-kuy
+      pass: '<redacted>'
+      email: eriosvaldoxiaomi0@gmail.com
+  - firewall
+  - 'php 8.2'
+  - 'node 24'
+  - mysql
+  - redis
+  - ssl
+  - 'ssl always'
+source: 'https://github.com/pterodactyl/panel'
+root: public_html/public
+nginx:
+  fastcgi: 'on'
+  locations:
+    -
+      match: /
+      try_files: '$uri $uri/ /index.php$is_args$args'
+commands:
+  - 'cp .env.example .env'
+  - 'composer install --no-dev --optimize-autoloader'
+  - 'sed -ri "s/(# )?DB_CONNECTION=.*/DB_CONNECTION=mysql/g" .env'
+  - 'sed -ri "s/(# )?DB_HOST=.*/DB_HOST=localhost/g" .env'
+  - 'sed -ri "s/(# )?DB_PORT=.*/DB_PORT=3306/g" .env'
+  - 'sed -ri "s/(# )?DB_DATABASE=.*/DB_DATABASE=${DATABASE}/g" .env'
+  - 'sed -ri "s/(# )?DB_USERNAME=.*/DB_USERNAME=${USERNAME}/g" .env'
+  - 'sed -ri "s/(# )?DB_PASSWORD=.*/DB_PASSWORD=${MYPASSWD}/g" .env'
+  - 'sed -ri "s/(# )?REDIS_PASSWORD=.*/REDIS_PASSWORD=${DATABASE}:::${RDPASSWD}/g" .env'
+  - 'sed -ri "s/(# )?REDIS_PORT=.*/REDIS_PORT=6479/g" .env'
+  - 'sed -ri "s|APP_URL=.*|APP_URL=https://${DOMAIN}|g" .env'
+  # FIX: key:generate ANTES de migrate (app key é necessária para criptografia)
+  - 'php artisan key:generate --force'
+  - 'php artisan migrate:fresh --seed --force'
+  - 'php artisan storage:link'
+  - 'yarn install --frozen-lockfile'
+  - 'yarn build:production || true'
+  - 'chmod 0750 -R storage || true'
+  - 'php artisan p:user:make -n --email=admin@${DOMAIN} --username=${USERNAME} --password=${PASSWORD} --admin=1 --name-first=My --name-last=Admin'
+  - 'printf "Done! Login to the admin panel with\n Username: ${USERNAME}\n Password: ${PASSWORD}\n"'
+
+---
+
+# ============================================================
+#  Pterodactyl WINGS  (Docker daemon)
+# ============================================================
+features:
+  -
+    create:
+      domain: hot-opportunity-fef.sgp.dom.my.id
+      user: hot-opportunity-fef
+      pass: '<redacted>'
+      email: eriosvaldoxiaomi0@gmail.com
+  - firewall
+  - ssl
+  - 'ssl always'
+source: 'https://github.com/willnode/wings.git'
+services: docker-compose.yml
+commands:
+  - 'cp -f docker-compose.example.yml docker-compose.yml'
+  # FIX: mantém a linha TZ e INSERE DOCKER_MOUNT_BASE_PATH logo abaixo
+  - 'sed -ri "s|(TZ[=:].*)|\1\n      DOCKER_MOUNT_BASE_PATH: $HOME|g" docker-compose.yml'
+  - 'sed -i "s|../var/run/docker.sock|/run/user/$(id -u)/docker.sock|g" docker-compose.yml'
+  - 'mkdir -p ../etc/pterodactyl/ ../var/{lib,log}/pterodactyl/ ../tmp/pterodactyl/'
+  - 'touch ../etc/pterodactyl/config.yml'
+  # FIX: printf com aspas simples escapadas corretamente em YAML (usar \047 ou aspas duplas externas)
+  - "printf 'Initial setup done! Please copy the config mentioned in your panel\\n to ~/etc/pterodactyl/config.yml using SSH or Filemin\\n and restart this by calling: docker compose restart\\n'"
